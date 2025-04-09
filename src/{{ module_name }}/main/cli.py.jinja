@@ -1,0 +1,29 @@
+import sys
+from typing import Sequence
+
+import alembic.config
+
+from {{ module_name }}.infrastructure.sqla_persistence.alembic.config import ALEMBIC_CONFIG
+
+
+def alembic_handler(argv: Sequence[str]) -> None:
+    alembic.config.main(
+        argv=['-c', ALEMBIC_CONFIG, *argv],
+    )
+
+def main() -> None:
+    args = sys.argv[1:]
+
+    if not args:
+        print("Usage: {{ module_name }} <command> [args]")
+        print("Available commands: alembic")
+        sys.exit(1)
+
+    command, *command_args = args
+
+    if command == "alembic":
+        alembic_handler(command_args)
+
+    else:
+        print(f"Unknown command: {command}")
+        sys.exit(1)
