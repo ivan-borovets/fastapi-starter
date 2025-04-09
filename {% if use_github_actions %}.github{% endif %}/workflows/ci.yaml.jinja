@@ -1,0 +1,48 @@
+name: CI
+
+on: [ push, pull_request ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12.0
+
+      - name: Install UV and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv==0.5.7
+          uv pip install -e '.[test,dev]' --system
+
+      - name: Format code
+        run: |
+          isort config/ src/ tests/
+          black config/ src/ tests/
+
+      - name: Lint code
+        run: |
+          bandit -r config/ src/ -c pyproject.toml
+          ruff check config/ src/ tests/
+          pylint config/ src/
+          mypy config/ src/
+
+      - name: Test code
+        run: |
+          pytest -v
+
+{% if use_toml_cfg_mgr %}
+      - name: Test Docker Compose setup
+        run: |
+          export APP_ENV=local
+          python config/toml_config_manager.py
+          cd config/local
+          echo "Generated .env.local content:"
+          cat .env.local
+          export COMPOSE_ENV_FILES=.env.local
+          docker compose up -d --build
+{% endif -%}

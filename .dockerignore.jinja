@@ -1,0 +1,33 @@
+# Venv
+.venv/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.mypy_cache/
+.ruff_cache/
+
+# IDE Specific
+.idea/
+.vscode/
+
+# Test artifacts
+.coverage
+htmlcov/
+
+# Documentation and non-essential files
+docs/
+{% if use_dishka or use_toml_cfg_mgr %}
+scripts/
+{% endif -%}
+LICENSE.jinja
+logo.jpg
+
+# Local environment
+.env*
