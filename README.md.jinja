@@ -1,0 +1,204 @@
+# Structure
+```
+.
+├── config/...                               # configuration files and scripts, includes Docker
+├── Makefile                                 # shortcuts for setup and common tasks
+├── scripts/...                              # helper scripts
+├── pyproject.toml                           # tooling and environment config (uv)
+├── ...
+└── src/
+    ├── {{ module_name }}/                     # first module
+    │   ├── application/...                  # application logic (interactors, ports, etc.)
+    │   ├── infrastructure/...               # adapters (e.g. SQLAlchemy, alembic setup)
+    │   │   └── sqla_persistence/alembic/... # per-module alembic config and versions
+    │   └── main/cli.py                      # entrypoint for CLI (`{{ module_name }} alembic ...`)
+    │
+    ├── main/run.py                          # run script (e.g. uvicorn entrypoint)
+    │
+    ├── setup/
+    │   ├── app_factory.py                   # app builder
+    │   ├── config/...                       # app settings
+    │   └── ioc/...                          # dependency injection setup
+    │
+    ├── shared/...                           # cross-module helpers or shared interfaces
+    └── ...
+```
+
+# First steps after generating a new project
+
+1. Initialize Git
+
+```shell
+git init
+```
+
+2. Set up virtual environment and install dependencies
+
+```shell
+# sudo apt update
+# sudo apt install pipx
+# pipx ensurepath
+# pipx install uv
+uv venv
+source .venv/bin/activate
+# .venv\Scripts\activate  # Windows
+# https://docs.astral.sh/uv/getting-started/installation/#shell-autocompletion
+# uv python install 3.12
+uv pip install -e .[test, dev]
+```
+
+    Don't forget to tell your IDE where the interpreter is located.
+
+3. Install pre-commit (if its yaml is included)
+
+```shell
+# https://pre-commit.com/
+pre-commit install
+```
+
+4. Check Makefile (if included)
+   Makefile provides helpful shortcuts like `make env`, `make dotenv`, `make up`, `make down`, etc.
+   Use a shell that supports `make`.
+
+5. Use prettifiers like Isort, Black, because template rendering isn't ideal
+
+```shell
+make code.format
+```
+
+# Configuration (if toml-config-manager is used)
+
+> **WARNING**
+> - Use any configuration method you prefer.
+
+This project uses TOML files as the single source of truth.
+`.env` files are generated from TOML and used by Docker and infrastructure, while the app reads from structured config
+directly.
+
+More info: [toml-config-manager](https://github.com/ivan-borovets/toml-config-manager).
+
+Usage example: [fastapi-clean-example](https://github.com/ivan-borovets/fastapi-clean-example).
+
+## Files in the `config/` folder
+
+- **config.toml**: Main application settings organized in sections
+- **export.toml**: Lists fields to export to .env (`export.fields = ["postgres.USER", "postgres.PASSWORD", ...]`)
+- **.secrets.toml**: Optional sensitive data (same format as config.toml, merged with main config)
+
+> **IMPORTANT**
+> - This project includes secret files for demonstration purposes only. In a real project, you **must** ensure that
+    `.secrets.toml` and all `.env` files are not tracked by version control system to prevent exposing sensitive
+    information. See this project's `.gitignore` for an example of how to properly exclude these sensitive files from
+    Git.
+
+> **Don’t forget to list `.secrets.toml` and all `.env.*` files in your `.gitignore`.**
+> This prevents sensitive data from being accidentally committed.
+
+## Local Environment
+
+1. Configure local environment
+
+* Create `.secrets.toml` in `config/local` following `.secrets.toml.example`
+* Edit TOML files in `config/local` according to your project requirements
+* When using Docker Compose, remember to pass `APP_ENV` to your service:
+
+```yaml
+services:
+  app:
+    # ...
+    environment:
+      APP_ENV: ${APP_ENV}
+```
+
+* `.env.local` will be generated later — **don't** create it manually
+
+2. Set environment variable
+
+```shell
+export APP_ENV=local
+# export APP_ENV=dev
+# export APP_ENV=prod
+```
+
+3. Check it and generate `.env`
+
+```shell
+# Probably you'll need Python 3.12 installed on your system to run these commands. 
+# The next code section provides commands for its fast installation.
+make env  # should print APP_ENV=local
+make dotenv  # should tell you where .env.local was generated
+```
+
+4. Launch
+
+- To run only the database in Docker and use the app locally, use the following command:
+
+    ```shell
+    make up.db
+    # make up.db-echo
+    # if you have multiple modules/databases, update the Makefile accordingly
+    ```
+
+- Then, apply the migrations:
+    ```shell
+    {{ module_name }} alembic upgrade head
+# <second_module_name> alembic upgrade head, ...
+```
+
+- After applying the migrations, the database is ready, and you can launch the application locally (e.g., through your
+  IDE). Remember to set the `APP_ENV` environment variable in your IDE's run configuration.
+
+- To run via Docker Compose:
+
+    ```shell
+    make up
+    # make up.echo
+    # if you have multiple modules/databases, update the Makefile accordingly
+    ```
+
+  In this case, migrations will be applied automatically at startup.
+
+5. Shutdown
+
+- To stop the containers, use:
+    ```shell
+    make down
+    ```
+
+## Other Environments (dev/prod)
+
+1. Use the instructions about [local environment](#local-environment) above
+
+* But make sure you've created similar structure in `config/dev` or `config/prod` with [files](#files):
+    * `config.toml`
+    * `.secrets.toml`
+    * `export.toml`
+    * `docker-compose.yaml` if needed
+* `.env.dev` or `.env.prod` to be generated later — **don't** create them manually
+
+## Adding New Environments
+
+1. Add new value to `ValidEnvs` enum in `config/toml_config_manager.py` (and maybe in your app settings)
+2. Update `ENV_TO_DIR_PATHS` mapping in the same file (and maybe in your app settings)
+3. Create corresponding directory in `config/` folder
+4. Add required configuration [files](#files)
+
+Environment directories can also contain other env-specific files like `docker-compose.yaml`, which will be used by
+Makefile commands.
+
+# Reference project
+
+Roughly similar setup: [fastapi-clean-example](https://github.com/ivan-borovets/fastapi-clean-example).
+
+## Adding Modules
+
+To add a new module, create a directory under `src/` with the same structure as the existing module.
+At minimum, include `application/` and `infrastructure/` — other layers are optional.
+
+If the module has its own database, don't forget to:
+
+- Prepare Alembic for it (see `[project.scripts]` in `pyproject.toml`, `{{ module_name }}.main.cli`,
+  `{{ module_name }}.infrastructure.sqla_persistence.alembic`)
+- Add it to `Makefile`, Docker Compose, and DI setup if needed
+- If multiple modules implement the same interface, use `NewType` or Dishka `components` to avoid conflicts.
+  See [Components and Providers Isolation](https://dishka.readthedocs.io/en/stable/advanced/components.html).

@@ -1,0 +1,54 @@
+services:
+  {{ project_name }}_db_pg:
+    container_name: "{{ project_name }}_db_pg_${APP_ENV}"
+    image: postgres:16-alpine
+    shm_size: 128mb
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  {{ project_name }}:
+    build:
+      context: ../..
+      dockerfile: config/${APP_ENV}/Dockerfile
+    image: {{ project_name }}:latest
+    environment:
+      APP_ENV: ${APP_ENV}
+      UVICORN_HOST: ${UVICORN_HOST}
+      UVICORN_PORT: ${UVICORN_PORT}
+      POSTGRES_HOST: {{ project_name }}_db_pg
+    ports:
+      - "${UVICORN_PORT}:${UVICORN_PORT}"
+    depends_on:
+      {{ project_name }}_db_pg:
+        condition: service_healthy
+    # ⚠️ Alembic migrations are not run by default.
+    # Uncomment and adjust one of the options below depending on your setup.
+    # sh -c "
+    # --- Example: single module ---
+    # {{ module_name }} alembic upgrade head &&
+    #
+    # --- Example: multiple modules ---
+    # {{ module_name }} alembic upgrade head &&
+    # second_module alembic upgrade head &&
+    # third_module alembic upgrade head &&
+    # ...
+    command: >
+      sh -c "
+      echo 'Starting Uvicorn...' &&
+      uvicorn main.run:make_app --host ${UVICORN_HOST} --port ${UVICORN_PORT} --loop uvloop
+      "
+
+volumes:
+  pgdata:

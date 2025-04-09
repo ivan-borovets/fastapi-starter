@@ -1,0 +1,47 @@
+from setup.app_factory import configure_app, create_app{% if use_dishka and use_toml_cfg_mgr %}, create_async_ioc_container{% endif %}
+{% if use_toml_cfg_mgr %}from setup.config.logs import configure_logging
+from setup.config.settings import AppSettings, load_settings{% endif %}
+{% if use_dishka and use_toml_cfg_mgr %}from setup.ioc.registry import get_providers
+from dishka import AsyncContainer, Provider
+from dishka.integrations.fastapi import setup_dishka{% endif %}
+from fastapi import FastAPI
+
+
+def make_app(
+    {% if use_dishka and use_toml_cfg_mgr -%}
+    *di_providers: Provider,
+    {% endif -%}
+    {% if use_toml_cfg_mgr -%}
+    settings: AppSettings | None = None,
+    {% endif -%}
+) -> FastAPI:
+    {% if use_toml_cfg_mgr -%}
+    if not settings:
+        settings = load_settings()
+
+    configure_logging(level=settings.logs.level)
+    {% endif -%}
+
+    app: FastAPI = create_app()
+    configure_app(app=app, root_router=...)
+    {% if use_dishka and use_toml_cfg_mgr %}
+    # Uncomment when providers will appear
+    # Also see setup.app_factory.lifespan !!!
+    # async_ioc_container: AsyncContainer = create_async_ioc_container(
+    #     providers=(*get_providers(), *di_providers),
+    #     settings=settings,
+    # )
+    # setup_dishka(container=async_ioc_container, app=app)
+    {% endif -%}
+    return app
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        app=make_app(),
+        port=8000,
+        reload=False,
+        loop="uvloop",
+    )
