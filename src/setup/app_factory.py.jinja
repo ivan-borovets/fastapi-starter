@@ -1,28 +1,31 @@
 # pylint: disable=C0301 (line-too-long)
 __all__ = (
-    "create_app",
     "configure_app",
+    "create_app",
     {% if use_dishka %}
     "create_async_ioc_container",
     {% endif -%}
 )
 
+from collections.abc import AsyncIterator{% if use_dishka %}, Iterable{% endif%}
 from contextlib import asynccontextmanager
-from typing import AsyncIterator{% if use_dishka %}, Iterable{% endif%}
 
-{% if use_dishka %}
+{% if use_dishka -%}
 from dishka import AsyncContainer, Provider, make_async_container
 {% endif -%}
 from fastapi import APIRouter, FastAPI
 from fastapi.responses import ORJSONResponse
 
-{% if use_dishka %}
+{% if use_dishka -%}
 from setup.config.settings import AppSettings
 {% endif -%}
 
 
 def create_app() -> FastAPI:
-    return FastAPI(lifespan=lifespan, default_response_class=ORJSONResponse)
+    return FastAPI(
+        lifespan=lifespan,
+        default_response_class=ORJSONResponse,
+    )
 
 
 @asynccontextmanager
@@ -32,7 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     {% if use_dishka %}
     # Uncomment when providers will appear
     # await app.state.dishka_container.close()  # noqa
-    # app.state is the place where dishka_container lives
+    # https://dishka.readthedocs.io/en/stable/integrations/fastapi.html
     {% endif %}
 
 def configure_app(

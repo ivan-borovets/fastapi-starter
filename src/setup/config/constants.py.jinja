@@ -2,13 +2,13 @@
 from enum import StrEnum
 {% endif -%}
 from pathlib import Path
-{% if use_toml_cfg_mgr %}
+{% if use_toml_cfg_mgr -%}
 from types import MappingProxyType
 {% endif -%}
 from typing import Final
 
 BASE_DIR_PATH: Final[Path] = Path(__file__).resolve().parent.parent.parent.parent
-{% if use_toml_cfg_mgr %}
+{% if use_toml_cfg_mgr -%}
 CONFIG_PATH: Final[Path] = BASE_DIR_PATH / "config"
 
 
@@ -22,13 +22,11 @@ class ValidEnvs(StrEnum):
     PROD = "prod"
 
 
-ENV_TO_DIR_PATHS: Final[MappingProxyType[ValidEnvs, Path]] = MappingProxyType(
-    {
-        ValidEnvs.LOCAL: CONFIG_PATH / ValidEnvs.LOCAL,
-        ValidEnvs.DEV: CONFIG_PATH / ValidEnvs.DEV,
-        ValidEnvs.PROD: CONFIG_PATH / ValidEnvs.PROD,
-    }
-)
+ENV_TO_DIR_PATHS: Final[MappingProxyType[ValidEnvs, Path]] = MappingProxyType({
+    ValidEnvs.LOCAL: CONFIG_PATH / ValidEnvs.LOCAL,
+    ValidEnvs.DEV: CONFIG_PATH / ValidEnvs.DEV,
+    ValidEnvs.PROD: CONFIG_PATH / ValidEnvs.PROD,
+})
 
 
 class DirContents(StrEnum):

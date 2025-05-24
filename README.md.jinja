@@ -1,4 +1,5 @@
 # Structure
+
 ```
 .
 ├── config/...                               # configuration files and scripts, includes Docker
@@ -40,11 +41,11 @@ git init
 # pipx ensurepath
 # pipx install uv
 # uv python install 3.12
-uv venv
+uv v
 source .venv/bin/activate
 # .venv\Scripts\activate  # Windows
 # https://docs.astral.sh/uv/getting-started/installation/#shell-autocompletion
-uv pip install -e .[test, dev]
+uv pip install -e '.[dev,test]'
 ```
 
     Don't forget to tell your IDE where the interpreter is located.
