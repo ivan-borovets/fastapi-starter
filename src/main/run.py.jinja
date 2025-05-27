@@ -1,4 +1,4 @@
-{% if use_dishka %}
+{% if use_dishka -%}
 from dishka import AsyncContainer, Provider
 from dishka.integrations.fastapi import setup_dishka
 {% endif -%}
@@ -21,11 +21,11 @@ def make_app(
 ) -> FastAPI:
     {% if use_toml_cfg_mgr -%}
     if not settings:
+        configure_logging()
         settings = load_settings()
 
     configure_logging(level=settings.logs.level)
-    {% endif -%}
-
+    {% endif %}
     app: FastAPI = create_app()
     configure_app(app=app, root_router=...)
 

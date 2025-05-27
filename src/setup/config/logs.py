@@ -1,38 +1,32 @@
 import logging
-from typing import Final, Literal, cast
-
-LoggingLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-
-VALID_LOGGING_LEVELS: Final[set[LoggingLevel]] = {
-    "DEBUG",
-    "INFO",
-    "WARNING",
-    "ERROR",
-    "CRITICAL",
-}
+from enum import StrEnum
+from typing import Final
 
 
-def validate_logging_level(*, level: str) -> LoggingLevel:
-    if level not in VALID_LOGGING_LEVELS:
-        raise ValueError(f"Invalid log level: '{level}'.")
-    return cast(LoggingLevel, level)
+class LoggingLevel(StrEnum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
 
 
-def configure_logging(*, level: LoggingLevel = "INFO") -> None:
-    validate_logging_level(level=level)
+DEFAULT_LOG_LEVEL: Final[LoggingLevel] = LoggingLevel.INFO
+
+
+def configure_logging(*, level: LoggingLevel = DEFAULT_LOG_LEVEL) -> None:
+    logging.getLogger().handlers.clear()
 
     level_map: dict[LoggingLevel, int] = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
+        LoggingLevel.DEBUG: logging.DEBUG,
+        LoggingLevel.INFO: logging.INFO,
+        LoggingLevel.WARNING: logging.WARNING,
+        LoggingLevel.ERROR: logging.ERROR,
+        LoggingLevel.CRITICAL: logging.CRITICAL,
     }
 
-    numeric_level: int = level_map.get(level, logging.INFO)
-
     logging.basicConfig(
-        level=numeric_level,
+        level=level_map[level],
         datefmt="%Y-%m-%d %H:%M:%S",
         format=(
             "[%(asctime)s.%(msecs)03d] "

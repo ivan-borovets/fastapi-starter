@@ -4,40 +4,50 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Final, Literal, cast
+from typing import Any, Final
 
 import rtoml
 
-LoggingLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+log = logging.getLogger(__name__)
 
-VALID_LOGGING_LEVELS: Final[set[LoggingLevel]] = {
-    "DEBUG",
-    "INFO",
-    "WARNING",
-    "ERROR",
-    "CRITICAL",
-}
+
+# LOGGING
+
+
+LOG_LEVEL_VAR_NAME: Final[str] = "LOG_LEVEL"
+
+
+class LoggingLevel(StrEnum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+DEFAULT_LOG_LEVEL: Final[LoggingLevel] = LoggingLevel.INFO
 
 
 def validate_logging_level(*, level: str) -> LoggingLevel:
-    if level not in VALID_LOGGING_LEVELS:
-        raise ValueError(f"Invalid log level: '{level}'.")
-    return cast(LoggingLevel, level)
+    try:
+        return LoggingLevel(level)
+    except ValueError as e:
+        raise ValueError(f"Invalid log level: '{level}'.") from e
 
 
-def configure_logging(*, level: LoggingLevel = "INFO") -> None:
+def configure_logging(*, level: LoggingLevel = DEFAULT_LOG_LEVEL) -> None:
+    logging.getLogger().handlers.clear()
+
     level_map: dict[LoggingLevel, int] = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
+        LoggingLevel.DEBUG: logging.DEBUG,
+        LoggingLevel.INFO: logging.INFO,
+        LoggingLevel.WARNING: logging.WARNING,
+        LoggingLevel.ERROR: logging.ERROR,
+        LoggingLevel.CRITICAL: logging.CRITICAL,
     }
 
-    numeric_level: int = level_map.get(level, logging.INFO)
-
     logging.basicConfig(
-        level=numeric_level,
+        level=level_map[level],
         datefmt="%Y-%m-%d %H:%M:%S",
         format=(
             "[%(asctime)s.%(msecs)03d] "
@@ -49,10 +59,10 @@ def configure_logging(*, level: LoggingLevel = "INFO") -> None:
     )
 
 
-log = logging.getLogger(__name__)
+# ENVIRONMENT & PATHS
 
-BASE_DIR_PATH: Final[Path] = Path(__file__).resolve().parent.parent
-CONFIG_PATH: Final[Path] = BASE_DIR_PATH / "config"
+
+ENV_VAR_NAME: Final[str] = "APP_ENV"
 
 
 class ValidEnvs(StrEnum):
@@ -63,13 +73,6 @@ class ValidEnvs(StrEnum):
     LOCAL = "local"
     DEV = "dev"
     PROD = "prod"
-
-
-ENV_TO_DIR_PATHS: Final[MappingProxyType[ValidEnvs, Path]] = MappingProxyType({
-    ValidEnvs.LOCAL: CONFIG_PATH / ValidEnvs.LOCAL,
-    ValidEnvs.DEV: CONFIG_PATH / ValidEnvs.DEV,
-    ValidEnvs.PROD: CONFIG_PATH / ValidEnvs.PROD,
-})
 
 
 class DirContents(StrEnum):
@@ -83,18 +86,35 @@ class DirContents(StrEnum):
     DOTENV_NAME = ".env"
 
 
-ENV_VAR_NAME: Final[str] = "APP_ENV"
+BASE_DIR_PATH: Final[Path] = Path(__file__).resolve().parent.parent
+CONFIG_PATH: Final[Path] = BASE_DIR_PATH / "config"
+
+
+ENV_TO_DIR_PATHS: Final[MappingProxyType[ValidEnvs, Path]] = MappingProxyType({
+    ValidEnvs.LOCAL: CONFIG_PATH / ValidEnvs.LOCAL,
+    ValidEnvs.DEV: CONFIG_PATH / ValidEnvs.DEV,
+    ValidEnvs.PROD: CONFIG_PATH / ValidEnvs.PROD,
+})
 
 
 def validate_env(*, env: str | None) -> ValidEnvs:
-    if env is None or env not in ValidEnvs:
+    if env is None:
+        raise ValueError(f"{ENV_VAR_NAME} is not set.")
+    try:
+        return ValidEnvs(env)
+    except ValueError as e:
         valid_values = ", ".join(f"'{e}'" for e in ValidEnvs)
-        env_display = "not set" if env is None else f"'{env}'"
         raise ValueError(
-            f"Environment variable {ENV_VAR_NAME} has invalid value: {env_display}. "
-            f"Must be one of: {valid_values}.",
-        )
-    return ValidEnvs(env)
+            f"Invalid {ENV_VAR_NAME}: '{env}'. Must be one of: {valid_values}."
+        ) from e
+
+
+def get_current_env() -> ValidEnvs:
+    env_value = os.getenv(ENV_VAR_NAME)
+    return validate_env(env=env_value)
+
+
+# CONFIG READING
 
 
 def read_config(
@@ -133,6 +153,9 @@ def load_full_config(*, env: ValidEnvs) -> dict[str, Any]:
     else:
         config = merge_dicts(dict1=config, dict2=secrets)
     return config
+
+
+# EXPORT PROCESSING
 
 
 def get_env_value_by_export_field(*, config: dict[str, Any], field: str) -> Any:
@@ -176,6 +199,9 @@ def load_export_fields(*, env: ValidEnvs) -> tuple[dict[str, Any], list[str]]:
     return config, export_fields
 
 
+# DOTENV GENERATION
+
+
 def write_dotenv_file(*, env: ValidEnvs, exported_fields: dict[str, str]) -> None:
     env_filename = f"{DirContents.DOTENV_NAME}.{env.value}"
     env_path = ENV_TO_DIR_PATHS[env] / env_filename
@@ -210,12 +236,15 @@ def generate_dotenv(*, env: ValidEnvs) -> None:
     write_dotenv_file(env=env, exported_fields=exported_fields)
 
 
+# ENTRY POINT
+
+
 def main() -> None:
-    log_lvl: str = os.getenv("LOG_LEVEL", "INFO")
+    log_lvl: str = os.getenv(LOG_LEVEL_VAR_NAME, DEFAULT_LOG_LEVEL)
     validated_log_lvl: LoggingLevel = validate_logging_level(level=log_lvl)
     configure_logging(level=validated_log_lvl)
-    raw_env = os.getenv(key="APP_ENV")
-    current_env = validate_env(env=raw_env)
+
+    current_env = get_current_env()
     generate_dotenv(env=current_env)
 
 
