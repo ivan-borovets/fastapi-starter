@@ -20,7 +20,7 @@ def make_app(
     {% endif -%}
 ) -> FastAPI:
     {% if use_toml_cfg_mgr -%}
-    if not settings:
+    if settings is None:
         configure_logging()
         settings = load_settings()
 
